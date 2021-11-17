@@ -1,9 +1,8 @@
-from numpy.lib.npyio import load
 import torch
 import torchvision
 import numpy as np
 
-from torchvision.models.detection.faster_rcnn import FasterRCNN,FastRCNNPredictor
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from src.utils import jaccard
 
