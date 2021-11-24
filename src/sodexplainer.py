@@ -73,8 +73,14 @@ class SODExplainer:
     
     #get_explnation for the image
     def get_explanation(self,image_test,data_obj):
+	"""Args: 
+	image_test: image in numpy array form with dtype= double and image shape(_,_,3)
+	data_obj : data_obj (img, target): A sample from the PennFudanDataset 
+		note : image_test and data_obj should be of same image in different form.
+
+	Returns : An ImageExplanation object (see lime documentation: https://lime-ml.readthedocs.io/en/latest/lime.html#module-lime.explanation) with 		the corresponding explanations
+	"""
       explainer = LimeImageExplainer(verbose=True)
-      # self.logger.info("Explaining object: ")
       explanation = explainer.explain_instance(
           image= image_test,
           classifier_fn=self.get_class_probability(data_obj),
