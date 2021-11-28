@@ -9,15 +9,21 @@ from src.utils import jaccard
 
 class SODExplainer:
     def __init__(
-        self, model, num_samples
+        self, 
+        model, 
+        num_samples, 
+        num_features=100000,
+
     ):
         """[summary]
         Args:
             model (torch.nn): Object detector.
             num_samples (int): number of perturbations in LIME explainer
+            num_features (int): number of features in LIME explainer, default = 100000
         """
         self.model = model
         self.num_samples = num_samples
+        self.num_features = num_features
           
     def get_class_probability(self, data_obj):
         """ The Method takes one image from the dataset and returns the class score as the probability 
@@ -77,6 +83,7 @@ class SODExplainer:
         explanation = explainer.explain_instance(
             image= image_test,
             classifier_fn=self.get_class_probability(data_obj),
-            num_samples=self.num_samples)
+            num_samples=self.num_samples,
+            num_features=self.num_features)
         return explanation
  
