@@ -45,9 +45,6 @@ def fasterrcnn_resnet18_fpn(pretrained=False, progress=True,
     trainable_backbone_layers = _validate_trainable_layers(
         pretrained or pretrained_backbone, trainable_backbone_layers, 5, 3)
 
-    if pretrained:
-        # no need to download the backbone if pretrained is set
-        pretrained_backbone = False
     backbone = resnet_fpn_backbone('resnet18', pretrained_backbone, trainable_layers=trainable_backbone_layers)
     model = FasterRCNN(backbone, num_classes, **kwargs)
     # if pretrained:
