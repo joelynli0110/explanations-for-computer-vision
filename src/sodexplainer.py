@@ -24,6 +24,7 @@ class SODExplainer:
         self.model = model
         self.num_samples = num_samples
         self.num_features = num_features
+        self.model.eval()
           
     def get_class_probability(self, data_obj):
         """ The Method takes one image from the dataset and returns the class score as the probability 
@@ -43,29 +44,31 @@ class SODExplainer:
             Returns:
                 img_probs (numpy.array): Probabilities of binary classification for each image, with shape (num_images, 2)
             """
-            self.model.eval() # set the module in evaluation mode
+            # self.model.eval() # set the module in evaluation mode
+            
             img_probs = []
-            for img_as_array in img_as_arrays:
-                img = torch.Tensor(img_as_array)
-                boxes = self.model(img.unsqueeze(0).permute(0,3,1,2))[0]['boxes']
-                scores = self.model(img.unsqueeze(0).permute(0,3,1,2))[0]['scores']
-
-                if boxes.size() == 0: 
-                    # if there's no object detected
-                    prob = 0
-                    print("No object detected!")
-                else:
-                    ious = jaccard(target['boxes'],boxes) # ious with shape (num_objs, num_boxes)
-                    ious = ious[ious > 0.4].unsqueeze(1) 
-                    if ious.size() == 0: # No score above the threshold
+            with torch.no_grad():
+                for img_as_array in img_as_arrays:
+                    img = torch.Tensor(img_as_array)
+                    boxes = self.model(img.unsqueeze(0).permute(0,3,1,2))[0]['boxes']
+                    scores = self.model(img.unsqueeze(0).permute(0,3,1,2))[0]['scores']
+    
+                    if boxes.size() == 0: 
+                        # if there's no object detected
                         prob = 0
-                        print("No score above the threshold!")
+                        print("No object detected!")
                     else:
-                        print(ious)
-                        obj_idx, box_idx = np.unravel_index(torch.argmax(ious), ious.shape) # retrieve argmax-indices in 2d
-                        prob = scores[box_idx] 
-                probabilities = [prob, 1 - prob]
-                img_probs.append(np.array(probabilities))   
+                        ious = jaccard(target['boxes'],boxes) # ious with shape (num_objs, num_boxes)
+                        ious = ious[ious > 0.4].unsqueeze(1) 
+                        if ious.size() == 0: # No score above the threshold
+                            prob = 0
+                            print("No score above the threshold!")
+                        else:
+                            print(ious)
+                            obj_idx, box_idx = np.unravel_index(torch.argmax(ious), ious.shape) # retrieve argmax-indices in 2d
+                            prob = scores[box_idx] 
+                    probabilities = [prob, 1 - prob]
+                    img_probs.append(np.array(probabilities))   
             return np.array(img_probs)
 
         return get_probabilities
