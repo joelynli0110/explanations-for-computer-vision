@@ -1,3 +1,4 @@
+import os
 import torch
 import torchvision
 import numpy as np
@@ -7,23 +8,20 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from src.utils import jaccard
 
+from skimage.transform import resize
+from tqdm import tqdm
+
 class SODExplainer:
     def __init__(
         self, 
-        model, 
-        num_samples, 
-        num_features=100000,
-
+        model,
     ):
         """[summary]
         Args:
             model (torch.nn): Object detector.
-            num_samples (int): number of perturbations in LIME explainer
-            num_features (int): number of features in LIME explainer, default = 100000
+
         """
         self.model = model
-        self.num_samples = num_samples
-        self.num_features = num_features
         self.model.eval()
           
     def get_class_probability(self, data_obj):
@@ -74,11 +72,13 @@ class SODExplainer:
         return get_probabilities
     
     #get_explnation for the image
-    def get_explanation(self,image_test,data_obj):
+    def get_lime_explanation(self,image_test,data_obj, num_samples, num_features=100000):
         """Args: 
         image_test: image in numpy array form with dtype= double and image shape(_,_,3)
         data_obj : data_obj (img, target): A sample from the PennFudanDataset 
             note : image_test and data_obj should be of same image in different form.
+        num_samples (int): number of perturbations in LIME explainer
+        num_features (int): number of features in LIME explainer, default = 100000
 
         Returns : An ImageExplanation object (see lime documentation: https://lime-ml.readthedocs.io/en/latest/lime.html#module-lime.explanation) with 		the corresponding explanations
         """
@@ -86,7 +86,50 @@ class SODExplainer:
         explanation = explainer.explain_instance(
             image= image_test,
             classifier_fn=self.get_class_probability(data_obj),
-            num_samples=self.num_samples,
-            num_features=self.num_features)
+            num_samples=num_samples,
+            num_features=num_features)
         return explanation
- 
+
+    def get_rise_explanation(self,image_test,data_obj, N, s, p1):
+        """Args: 
+        TODO
+        
+        Returns : TODO
+        """
+        input_size = image_test.shape[0:2]
+        cell_size = np.ceil(np.array(input_size) / s)
+        up_size = (s + 1) * cell_size
+
+        grid = np.random.rand(N, s, s) < p1
+        grid = grid.astype('float32')
+
+        masks = np.empty((N, *input_size))
+        for i in tqdm(range(N), desc='Generating masks'):
+            # Random shifts
+            x = np.random.randint(0, cell_size[0])
+            y = np.random.randint(0, cell_size[1])
+            # Linear upsampling and cropping
+            masks[i, :, :] = resize(grid[i], up_size, order=1, mode='reflect',
+                                    anti_aliasing=False)[x:x + input_size[0], y:y + input_size[1]]
+
+        masks = masks.reshape(-1, *input_size, 1)
+        preds = []
+        # Make sure multiplication is being done for correct axes
+        masked = image_test * masks
+        
+        sal = np.zeros_like(masked[0])
+
+        for i in tqdm(range(0, N), desc='Explaining'):
+            pred = self.model(masked[i].permute(2, 0, 1).view(1, 3, input_size[0], input_size[1]).float())
+      
+            labels = pred[0]["labels"].detach().numpy()
+            scores = pred[0]["scores"].detach().numpy()
+            
+            for j, label in enumerate(labels):
+                if label == 1:
+                    preds.append(scores[j])
+                    sal += scores[j] * masked[i].numpy()
+                    
+        sal = sal / len(preds) / p1
+        print(len(preds))
+        return sal.sum(axis=2), preds, masked
