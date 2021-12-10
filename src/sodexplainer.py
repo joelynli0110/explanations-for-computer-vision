@@ -90,33 +90,41 @@ class SODExplainer:
             num_features=num_features)
         return explanation
 
-    def get_rise_explanation(self,image_test,data_obj, N, s, p1):
+    def get_rise_explanation(self,image_test, N, s, p1):
         """Args: 
-        TODO
+        image_test: image in numpy array form with dtype= double and image shape(_,_,3)
+        N: Number of masks that are generated
+        s: Width and height of binary mask
+        p1: Const. factor for saliency values
         
-        Returns : TODO
+        Returns :
+        sal: Resulting saliency image after RISE explanation
         """
         input_size = image_test.shape[0:2]
         cell_size = np.ceil(np.array(input_size) / s)
         up_size = (s + 1) * cell_size
-
+        
+        # Binary masks as grid
+        # One grid per mask with size s x s
         grid = np.random.rand(N, s, s) < p1
         grid = grid.astype('float32')
 
+        # Masks have the same size as the input image
         masks = np.empty((N, *input_size))
+        
         for i in tqdm(range(N), desc='Generating masks'):
-            # Random shifts
+            # Random shifts for later cropping
             x = np.random.randint(0, cell_size[0])
             y = np.random.randint(0, cell_size[1])
             # Linear upsampling and cropping
+            # Resize and crop binary grid masks
+            # Resulting masks are smooth
             masks[i, :, :] = resize(grid[i], up_size, order=1, mode='reflect',
                                     anti_aliasing=False)[x:x + input_size[0], y:y + input_size[1]]
 
         masks = masks.reshape(-1, *input_size, 1)
         preds = []
-        # Make sure multiplication is being done for correct axes
         masked = image_test * masks
-        
         sal = np.zeros_like(masked[0])
 
         for i in tqdm(range(0, N), desc='Explaining'):
@@ -126,10 +134,14 @@ class SODExplainer:
             scores = pred[0]["scores"].detach().numpy()
             
             for j, label in enumerate(labels):
+                # Label pedestrian
+                # TODO (sherif): add label as input to function for case with mutiple labels (E.g. coco)
                 if label == 1:
                     preds.append(scores[j])
+                    # Weighted sum of masks and all scores
                     sal += scores[j] * masked[i].numpy()
                     
         sal = sal / len(preds) / p1
-        print(len(preds))
+        
+        # sum saliency over 3 RGB channels
         return sal.sum(axis=2), preds, masked
