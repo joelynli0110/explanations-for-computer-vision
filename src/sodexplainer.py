@@ -48,22 +48,22 @@ class SODExplainer:
             with torch.no_grad():
                 for img_as_array in img_as_arrays:
                     img = torch.Tensor(img_as_array)
-                    boxes = self.model(img.unsqueeze(0).permute(0,3,1,2))[0]['boxes']
-                    scores = self.model(img.unsqueeze(0).permute(0,3,1,2))[0]['scores']
+                    boxes = self.model(img.unsqueeze(0).permute(0,3,1,2).cuda())[0]['boxes']
+                    scores = self.model(img.unsqueeze(0).permute(0,3,1,2).cuda())[0]['scores']
     
                     if boxes.size() == 0: 
                         # if there's no object detected
                         prob = 0
                         print("No object detected!")
                     else:
-                        ious = jaccard(target['boxes'],boxes) # ious with shape (num_objs, num_boxes)
+                        ious = jaccard(target['boxes'].cuda(),boxes) # ious with shape (num_objs, num_boxes)
                         ious = ious[ious > 0.4].unsqueeze(1) 
-                        if ious.size() == 0: # No score above the threshold
+                        if ious.size(0) == 0: # No score above the threshold
                             prob = 0
                             print("No score above the threshold!")
                         else:
-                            print(ious)
-                            obj_idx, box_idx = np.unravel_index(torch.argmax(ious), ious.shape) # retrieve argmax-indices in 2d
+                            # print(ious)
+                            obj_idx, box_idx = np.unravel_index(torch.argmax(ious.cpu()), ious.shape) # retrieve argmax-indices in 2d
                             prob = scores[box_idx] 
                     probabilities = [prob, 1 - prob]
                     img_probs.append(np.array(probabilities))   
@@ -110,7 +110,7 @@ class SODExplainer:
         grid = grid.astype('float32')
 
         # Masks have the same size as the input image
-        masks = np.empty((N, *input_size))
+        masks = torch.empty((N, *input_size))
         
         for i in tqdm(range(N), desc='Generating masks'):
             # Random shifts for later cropping
@@ -119,19 +119,20 @@ class SODExplainer:
             # Linear upsampling and cropping
             # Resize and crop binary grid masks
             # Resulting masks are smooth
-            masks[i, :, :] = resize(grid[i], up_size, order=1, mode='reflect',
-                                    anti_aliasing=False)[x:x + input_size[0], y:y + input_size[1]]
+            masks[i, :, :] = torch.from_numpy(resize(grid[i], up_size, order=1, mode='reflect',
+                                    anti_aliasing=False)[x:x + input_size[0], y:y + input_size[1]])
 
         masks = masks.reshape(-1, *input_size, 1)
         preds = []
-        masked = image_test * masks
-        sal = np.zeros_like(masked[0])
+        masked = (image_test * masks).cuda()
+        sal = torch.zeros_like(masked[0])
 
         for i in tqdm(range(0, N), desc='Explaining'):
-            pred = self.model(masked[i].permute(2, 0, 1).view(1, 3, input_size[0], input_size[1]).float())
+          with torch.no_grad():
+            pred = self.model(masked[i].permute(2, 0, 1).view(1, 3, input_size[0], input_size[1]).float().cuda())
       
-            labels = pred[0]["labels"].detach().numpy()
-            scores = pred[0]["scores"].detach().numpy()
+            labels = pred[0]["labels"]
+            scores = pred[0]["scores"]
             
             for j, label in enumerate(labels):
                 # Label pedestrian
@@ -139,7 +140,7 @@ class SODExplainer:
                 if label == 1:
                     preds.append(scores[j])
                     # Weighted sum of masks and all scores
-                    sal += scores[j] * masked[i].numpy()
+                    sal += scores[j] * masked[i]
                     
         sal = sal / len(preds) / p1
         
