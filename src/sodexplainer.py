@@ -57,7 +57,7 @@ class SODExplainer:
                         print("No object detected!")
                     else:
                         ious = jaccard(target['boxes'].cuda(),boxes) # ious with shape (num_objs, num_boxes)
-                        ious = ious[ious > 0.4].unsqueeze(1) 
+                        ious = ious[ious > 0.1].unsqueeze(1) 
                         if ious.size(0) == 0: # No score above the threshold
                             prob = 0
                             print("No score above the threshold!")
@@ -90,7 +90,7 @@ class SODExplainer:
             num_features=num_features)
         return explanation
 
-    def get_rise_explanation(self,image_test, N, s, p1):
+    def get_rise_explanation(self,image_test, N, s, p1, class_index):
         """Args: 
         image_test: image in numpy array form with dtype= double and image shape(_,_,3)
         N: Number of masks that are generated
@@ -131,16 +131,16 @@ class SODExplainer:
           with torch.no_grad():
             pred = self.model(masked[i].permute(2, 0, 1).view(1, 3, input_size[0], input_size[1]).float().cuda())
       
-            labels = pred[0]["labels"]
-            scores = pred[0]["scores"]
-            
-            for j, label in enumerate(labels):
-                # Label pedestrian
-                # TODO (sherif): add label as input to function for case with mutiple labels (E.g. coco)
-                if label == 1:
-                    preds.append(scores[j])
-                    # Weighted sum of masks and all scores
-                    sal += scores[j] * masked[i]
+            # Take highest score for first label only
+            label = pred[0]["labels"][0]
+            score = pred[0]["scores"][0]
+
+            # for j, label in enumerate(labels):
+            #     # Label pedestrian
+            if label == class_index:
+                preds.append(score)
+                # Weighted sum of masks and all scores
+                sal += score * masked[i]
                     
         sal = sal / len(preds) / p1
         
