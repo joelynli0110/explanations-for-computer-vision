@@ -140,7 +140,7 @@ class SODExplainer:
             if label == class_index:
                 preds.append(score)
                 # Weighted sum of masks and all scores
-                sal += score * masked[i]
+                sal += score * masks[i].cuda()
                     
         sal = sal / len(preds) / p1
         
