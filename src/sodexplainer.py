@@ -132,15 +132,16 @@ class SODExplainer:
             pred = self.model(masked[i].permute(2, 0, 1).view(1, 3, input_size[0], input_size[1]).float().cuda())
       
             # Take highest score for first label only
-            label = pred[0]["labels"][0]
-            score = pred[0]["scores"][0]
+            if len(pred[0]["labels"]) > 0:
+                label = pred[0]["labels"][0]
+                score = pred[0]["scores"][0]
 
-            # for j, label in enumerate(labels):
-            #     # Label pedestrian
-            if label == class_index:
-                preds.append(score)
-                # Weighted sum of masks and all scores
-                sal += score * masks[i].cuda()
+                # for j, label in enumerate(labels):
+                #     # Label pedestrian
+                if label == class_index:
+                    preds.append(score)
+                    # Weighted sum of masks and all scores
+                    sal += score * masks[i].cuda()
                     
         sal = sal / len(preds) / p1
         
