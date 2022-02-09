@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-<<<<<<< HEAD
+
 import matplotlib.pyplot as plt
 import torch
 from torch import nn
