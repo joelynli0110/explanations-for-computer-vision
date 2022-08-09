@@ -1,4 +1,4 @@
-# LIME AND RISE Explanations for Object Detection
+# LIME and RISE Explanations for Object Detection
 
 This repository contains the implementation of the project 'Explanation for Computer Vision' in which we apply explanation techniques [LIME](https://arxiv.org/abs/1602.04938) and [RISE](https://arxiv.org/abs/1806.07421) for object detection. You can find the paper [here](./final_report.pdf). <br>
 In order to see the demo of this project, you need to run ```check_explanations_coco.ipynb``` . 
